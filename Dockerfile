@@ -1,7 +1,10 @@
 # this docker file describes the test environment for the assignment
-FROM ubuntu:18.10
+FROM ubuntu:18.04
+RUN sed -i 's/cosmic/bionic/g' /etc/apt/sources.list
 RUN apt-get update
 RUN apt-get upgrade -y
+RUN apt dist-upgrade
+RUN apt-get -f install
 RUN apt-get install -y python3 python3-dev python3-setuptools python3-pip curl wget git vim 
 RUN pip3 install django flask-sockets flask gunicorn
 RUN echo -e '\n\n\n\n\n\n\n\n' | adduser --disabled-password --quiet me
