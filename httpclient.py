@@ -34,24 +34,25 @@ class HTTPResponse(object):
 
 class HTTPClient(object):
     def get_host_port(self,url):
-        temp = urllib.parse.urlparse(url)
-        print(temp)
-        path, args = temp.path, temp.params
-        temp = path.split(':')
-        host= temp[0]
+        parseStr = urllib.parse.urlparse(url)
+
+        print(parseStr)
+        host, path = parseStr.netloc, parseStr.path
+        temp = host.split(':')
         port = None
+        host = temp[0]
         if len(temp) > 1:
             port = temp[1]
             try:
                 port = int(port)
             except ValueError:
                 print('please give a correct port')
-
-        return host, port, args
+        if not path:
+            path = '/'
+        return host, port, path
 
     def connect(self, host, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if port:
             self.socket.connect((host, port))
         else:
@@ -85,27 +86,41 @@ class HTTPClient(object):
                 done = not part
         return buffer.decode('utf-8')
 
-    def GET(self, host, args=None):
-        code = 200
-        header = '''GET \ HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n'''.format(host)
-        print(header)
-        body = ""
-        self.sendall(header)
-        res = self.recvall(self.socket)
-        print(res)
+    def GET(self, url, args=None):
+        host, port, path = self.get_host_port(url)
+        self.connect(host, port)
 
+        request = '''GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n'''.format(path, host)
+        self.sendall(request)
+        res = self.recvall(self.socket)
+        resList = res.split()
+        code = int(resList[1])
+        resStream = res.split('\r\n\r\n')
+        header, body = resStream[0], resStream[-1]
+        return HTTPResponse(code, body)
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        host, port, path = self.get_host_port(url)
+        self.connect(host, port)
+
+        if args:
+            args = urllib.parse.urlencode(args)
+        else:
+            args = ''
+        contentLen = len(args.encode('utf-8'))
+        request = '''POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}'''.format(path, host, contentLen, args)
+        self.sendall(request)
+        res = self.recvall(self.socket)
+        resList = res.split()
+        code = int(resList[1])
+        resStream = res.split('\r\n\r\n')
+        header, body = resStream[0], resStream[-1]
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
-        host, port, args = self.get_host_port(url)
-        self.connect(host, port)
         if (command == "POST"):
             return self.POST( url, args )
         else:
-            return self.GET( host, args )
+            return self.GET( url, args )
     
 if __name__ == "__main__":
     client = HTTPClient()
